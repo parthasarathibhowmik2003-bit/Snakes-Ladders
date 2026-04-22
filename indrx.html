@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snakes & Ladders</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+:root{--bg:#0F1923;--fg:#F0E6D3;--muted:#6B7B8D;--accent:#FFB703;--card:#162232;--border:#253545;--p1:#E63946;--p2:#219EBC;--snake:#D62839;--ladder:#FB8500}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--fg);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 40%,rgba(255,183,3,.05) 0%,transparent 50%),radial-gradient(ellipse at 80% 20%,rgba(33,158,188,.05) 0%,transparent 50%),radial-gradient(ellipse at 50% 90%,rgba(214,40,57,.04) 0%,transparent 50%);pointer-events:none;z-index:0}
+.fredoka{font-family:'Fredoka One',cursive}
+.dice{width:88px;height:88px;background:linear-gradient(145deg,#FFF8F0,#EDDCC4);border-radius:16px;display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:14px;box-shadow:0 5px 0 #C4A56E,0 8px 20px rgba(0,0,0,.45),inset 0 1px 3px rgba(255,255,255,.6);transition:transform .1s;user-select:none}
+.dice.rolling{animation:roll .55s ease-out}
+@keyframes roll{0%{transform:rotate(0) scale(.7)}20%{transform:rotate(180deg) scale(1.15)}50%{transform:rotate(400deg) scale(.85)}75%{transform:rotate(600deg) scale(1.08)}100%{transform:rotate(720deg) scale(1)}}
+.dot{width:100%;height:100%;border-radius:50%;background:transparent;transition:background .15s}
+.dot.on{background:radial-gradient(circle at 38% 38%,#4A3520,#1E0F05);box-shadow:inset 0 1px 2px rgba(0,0,0,.35)}
+.roll-btn{background:linear-gradient(135deg,var(--accent),#E09E00);color:#1A1A1A;border:none;padding:14px 44px;border-radius:50px;font-family:'Fredoka One',cursive;font-size:1.15rem;cursor:pointer;box-shadow:0 4px 0 #B87E00,0 6px 18px rgba(255,183,3,.25);transition:all .15s;letter-spacing:.5px}
+.roll-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 6px 0 #B87E00,0 10px 24px rgba(255,183,3,.35)}
+.roll-btn:active:not(:disabled){transform:translateY(2px);box-shadow:0 2px 0 #B87E00,0 3px 8px rgba(255,183,3,.25)}
+.roll-btn:disabled{opacity:.45;cursor:not-allowed;filter:grayscale(.3)}
+.p-card{border:2px solid var(--border);border-radius:14px;padding:14px 16px;background:var(--card);transition:all .35s}
+.p-card.active-p1{border-color:var(--p1);box-shadow:0 0 24px rgba(230,57,70,.18)}
+.p-card.active-p2{border-color:var(--p2);box-shadow:0 0 24px rgba(33,158,188,.18)}
+.board-wrap{position:relative;border-radius:14px;overflow:hidden;box-shadow:0 0 0 4px #C4A56E,0 0 0 8px rgba(196,165,110,.25),0 10px 40px rgba(0,0,0,.55)}
+.toast{position:fixed;top:24px;left:50%;transform:translateX(-50%) translateY(-120px);padding:13px 28px;border-radius:12px;font-weight:800;font-size:.95rem;z-index:1000;transition:transform .4s cubic-bezier(.34,1.56,.64,1);pointer-events:none;white-space:nowrap}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.snake{background:linear-gradient(135deg,#E63946,#B71C2A);color:#fff}
+.toast.ladder{background:linear-gradient(135deg,#FB8500,#D96E00);color:#fff}
+.toast.win{background:linear-gradient(135deg,#FFB703,#E09E00);color:#1A1A1A}
+.toast.info{background:linear-gradient(135deg,#219EBC,#167A92);color:#fff}
+.log-item{padding:5px 10px;border-radius:7px;font-size:.8rem;margin-bottom:3px;background:rgba(255,255,255,.025);border-left:3px solid var(--border);animation:slideIn .3s ease-out}
+@keyframes slideIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+.confetti{position:fixed;width:10px;height:10px;z-index:999;pointer-events:none;animation:confettiFall 2.8s ease-out forwards}
+@keyframes confettiFall{0%{opacity:1;transform:translateY(0) rotate(0)}100%{opacity:0;transform:translateY(100vh) rotate(720deg)}}
+.particle{position:fixed;border-radius:50%;pointer-events:none;z-index:0;opacity:0;animation:pFloat linear infinite}
+@keyframes pFloat{0%{transform:translateY(100vh) scale(0);opacity:0}10%{opacity:.6}90%{opacity:.6}100%{transform:translateY(-10vh) scale(1);opacity:0}}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div class="toast" id="toast"></div>
+
+<main class="relative z-10 flex flex-col items-center px-4 py-6 min-h-screen">
+  <!-- Title -->
+  <header class="text-center mb-5">
+    <h1 class="fredoka text-3xl md:text-4xl tracking-wide" style="color:var(--accent)">Snakes & Ladders</h1>
+    <p class="text-sm mt-1" style="color:var(--muted)">Roll the dice, climb the ladders, avoid the snakes</p>
+  </header>
+
+  <!-- Game Layout -->
+  <div class="flex flex-wrap justify-center items-start gap-5 w-full max-w-[900px]">
+    <!-- Board -->
+    <div class="board-wrap" id="boardWrap">
+      <canvas id="board"></canvas>
+    </div>
+
+    <!-- Side Panel -->
+    <div class="flex flex-col gap-4 w-full" style="max-width:260px;min-width:220px">
+      <!-- Player 1 -->
+      <div class="p-card" id="card0">
+        <div class="flex items-center gap-3 mb-1">
+          <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#FF6B6B,#C4222F);border:2px solid #fff;flex-shrink:0"></div>
+          <div>
+            <div class="font-bold text-sm" style="color:var(--p1)">Player 1</div>
+            <div class="text-xs" style="color:var(--muted)">Cell <span id="pos0">0</span></div>
+          </div>
+        </div>
+        <div class="w-full rounded-full h-1.5 mt-1" style="background:var(--border)">
+          <div class="h-full rounded-full transition-all duration-500" id="bar0" style="background:var(--p1);width:0%"></div>
+        </div>
+      </div>
+
+      <!-- Player 2 -->
+      <div class="p-card" id="card1">
+        <div class="flex items-center gap-3 mb-1">
+          <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#4DC9E6,#1A7A94);border:2px solid #fff;flex-shrink:0"></div>
+          <div>
+            <div class="font-bold text-sm" style="color:var(--p2)">Player 2</div>
+            <div class="text-xs" style="color:var(--muted)">Cell <span id="pos1">0</span></div>
+          </div>
+        </div>
+        <div class="w-full rounded-full h-1.5 mt-1" style="background:var(--border)">
+          <div class="h-full rounded-full transition-all duration-500" id="bar1" style="background:var(--p2);width:0%"></div>
+        </div>
+      </div>
+
+      <!-- Dice Area -->
+      <div class="flex flex-col items-center gap-4 p-5 rounded-2xl" style="background:var(--card);border:1px solid var(--border)">
+        <div class="dice" id="dice" role="img" aria-label="Dice">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        </div>
+        <button class="roll-btn" id="rollBtn" aria-label="Roll the dice">
+          <i class="fa-solid fa-dice mr-2"></i>Roll Dice
+        </button>
+        <div class="text-xs font-bold" id="turnLabel" style="color:var(--accent)">Player 1's Turn</div>
+      </div>
+
+      <!-- Game Log -->
+      <div class="rounded-xl p-3" style="background:var(--card);border:1px solid var(--border);max-height:200px;overflow-y:auto" id="logWrap">
+        <div class="text-xs font-bold mb-2" style="color:var(--muted)"><i class="fa-solid fa-scroll mr-1"></i>Game Log</div>
+        <div id="logList"></div>
+      </div>
+
+      <!-- New Game -->
+      <button class="w-full py-2.5 rounded-xl font-bold text-sm transition-all hover:brightness-125" style="background:var(--border);color:var(--fg);border:1px solid var(--border)" id="newBtn">
+        <i class="fa-solid fa-rotate-right mr-1"></i>New Game
+      </button>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="flex gap-5 mt-5 text-xs font-semibold" style="color:var(--muted)">
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--snake);vertical-align:middle;margin-right:4px"></span>Snake</span>
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:var(--ladder);vertical-align:middle;margin-right:4px"></span>Ladder</span>
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--accent);vertical-align:middle;margin-right:4px"></span>Star (cell 100)</span>
+  </div>
+</main>
+
+<script>
+/* ===================== GAME CONFIG ===================== */
+const GRID = 10;
+const SNAKES = [
+  {head:99, tail:54}, {head:95, tail:72}, {head:70, tail:55},
+  {head:52, tail:42}, {head:88, tail:24}, {head:28, tail:2}
+];
+const LADDERS = [
+  {bottom:6, top:25}, {bottom:11, top:40}, {bottom:17, top:74},
+  {bottom:36, top:57}, {bottom:46, top:90}, {bottom:60, top:85}
+];
+
+// Lookup maps
+const SNAKE_MAP = {};
+SNAKES.forEach(s => SNAKE_MAP[s.head] = s.tail);
+const LADDER_MAP = {};
+LADDERS.forEach(l => LADDER_MAP[l.bottom] = l.top);
+
+// Dice dot patterns (3x3 grid, 1=on)
+const DICE_PAT = {
+  1:[0,0,0,0,1,0,0,0,0], 2:[0,0,1,0,0,0,1,0,0],
+  3:[0,0,1,0,1,0,1,0,0], 4:[1,0,1,0,0,0,1,0,1],
+  5:[1,0,1,0,1,0,1,0,1], 6:[1,0,1,1,0,1,1,0,1]
+};
+
+/* ===================== STATE ===================== */
+let players = [{pos:0, disp:0},{pos:0, disp:0}];
+let curPlayer = 0;
+let animating = false;
+let gameOver = false;
+let cellSize = 60;
+
+/* ===================== DOM ===================== */
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+const diceEl = document.getElementById('dice');
+const dots = diceEl.querySelectorAll('.dot');
+const rollBtn = document.getElementById('rollBtn');
+const newBtn = document.getElementById('newBtn');
+const toastEl = document.getElementById('toast');
+const logList = document.getElementById('logList');
+const turnLabel = document.getElementById('turnLabel');
+
+/* ===================== HELPERS ===================== */
+function delay(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+// Cell number (1-100) → grid row/col (row 0 = top of canvas)
+function cellToGrid(n){
+  const idx = n - 1;
+  const rowFromBot = Math.floor(idx / 10);
+  let col = idx % 10;
+  if(rowFromBot % 2 === 1) col = 9 - col;
+  return { row: 9 - rowFromBot, col };
+}
+
+// Cell number → pixel center
+function cellToPx(n){
+  const g = cellToGrid(n);
+  return { x: g.col * cellSize + cellSize/2, y: g.row * cellSize + cellSize/2 };
+}
+
+function adjColor(hex, amt){
+  let r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  r = Math.max(0,Math.min(255,r+amt)); g = Math.max(0,Math.min(255,g+amt)); b = Math.max(0,Math.min(255,b+amt));
+  return `rgb(${r},${g},${b})`;
+}
+
+/* ===================== TOAST ===================== */
+let toastTimer = null;
+function showToast(msg, type){
+  toastEl.textContent = msg;
+  toastEl.className = 'toast ' + type;
+  requestAnimationFrame(() => toastEl.classList.add('show'));
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
+}
+
+/* ===================== LOG ===================== */
+function addLog(msg){
+  const d = document.createElement('div');
+  d.className = 'log-item';
+  d.textContent = msg;
+  logList.prepend(d);
+  // Keep max 30
+  while(logList.children.length > 30) logList.lastChild.remove();
+}
+
+/* ===================== DICE ===================== */
+function setDiceFace(v){
+  const pat = DICE_PAT[v] || DICE_PAT[1];
+  dots.forEach((d,i) => d.classList.toggle('on', !!pat[i]));
+}
+
+/* ===================== CONFETTI ===================== */
+function spawnConfetti(){
+  const colors = ['#FFB703','#E63946','#219EBC','#FB8500','#06D6A0','#FF006E'];
+  for(let i=0;i<60;i++){
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.left = Math.random()*100 + 'vw';
+    c.style.top = -10 + 'px';
+    c.style.background = colors[Math.floor(Math.random()*colors.length)];
+    c.style.width = (6+Math.random()*8)+'px';
+    c.style.height = (6+Math.random()*8)+'px';
+    c.style.borderRadius = Math.random()>.5?'50%':'2px';
+    c.style.animationDelay = Math.random()*1.2+'s';
+    c.style.animationDuration = (2+Math.random()*2)+'s';
+    document.body.appendChild(c);
+    setTimeout(()=>c.remove(), 5000);
+  }
+}
+
+/* ===================== FLOATING PARTICLES ===================== */
+function createParticles(){
+  const colors = ['rgba(255,183,3,0.3)','rgba(33,158,188,0.25)','rgba(230,57,70,0.2)'];
+  for(let i=0;i<12;i++){
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const s = 3+Math.random()*5;
+    p.style.width = s+'px'; p.style.height = s+'px';
+    p.style.left = Math.random()*100+'vw';
+    p.style.background = colors[Math.floor(Math.random()*colors.length)];
+    p.style.animationDuration = (12+Math.random()*18)+'s';
+    p.style.animationDelay = Math.random()*10+'s';
+    document.body.appendChild(p);
+  }
+}
+createParticles();
+
+/* ===================== DRAW BOARD ===================== */
+function drawBoard(){
+  const W = GRID * cellSize;
+  const H = GRID * cellSize;
+  ctx.clearRect(0,0,W,H);
+
+  // Draw cells
+  for(let r=0; r<GRID; r++){
+    for(let c=0; c<GRID; c++){
+      const n = r * 10 + c + 1; // Wrong - need to account for zigzag
+      // Actually: row r in canvas = game row (9-r) from bottom
+      // For visual row r: game row from bottom = 9-r
+      // If (9-r) is even: cell = (9-r)*10 + c + 1
+      // If (9-r) is odd: cell = (9-r)*10 + (9-c) + 1
+      const rowFromBot = 9 - r;
+      const cellNum = rowFromBot % 2 === 0
+        ? rowFromBot * 10 + c + 1
+        : rowFromBot * 10 + (9 - c) + 1;
+
+      const x = c * cellSize;
+      const y = r * cellSize;
+
+      // Base color - warm parchment with subtle checkerboard
+      const isLight = (r + c) % 2 === 0;
+      ctx.fillStyle = isLight ? '#F5E6C8' : '#EDD9B4';
+      ctx.fillRect(x, y, cellSize, cellSize);
+
+      // Subtle inner border
+      ctx.strokeStyle = 'rgba(180,150,100,0.25)';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(x+0.5, y+0.5, cellSize-1, cellSize-1);
+
+      // Snake head indicator
+      if(SNAKE_MAP[cellNum]){
+        ctx.fillStyle = 'rgba(214,40,57,0.12)';
+        ctx.fillRect(x, y, cellSize, cellSize);
+      }
+      // Ladder base indicator
+      if(LADDER_MAP[cellNum]){
+        ctx.fillStyle = 'rgba(251,133,0,0.12)';
+        ctx.fillRect(x, y, cellSize, cellSize);
+      }
+      // Star for 100
+      if(cellNum === 100){
+        ctx.fillStyle = 'rgba(255,183,3,0.15)';
+        ctx.fillRect(x, y, cellSize, cellSize);
+      }
+
+      // Number
+      const fontSize = Math.max(9, cellSize * 0.2);
+      ctx.font = `700 ${fontSize}px Nunito`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = (r + c) % 2 === 0 ? 'rgba(80,60,30,0.55)' : 'rgba(80,60,30,0.65)';
+      ctx.fillText(cellNum, x + 4, y + 3);
+    }
+  }
+
+  // Draw ladders
+  LADDERS.forEach(l => drawLadder(l.bottom, l.top));
+
+  // Draw snakes
+  SNAKES.forEach((s,i) => drawSnake(s.head, s.tail, i));
+
+  // Draw star on 100
+  drawStar(100);
+
+  // Draw tokens
+  drawTokens();
+}
+
+/* ===================== DRAW LADDER ===================== */
+function drawLadder(bot, top){
+  const p1 = cellToPx(bot);
+  const p2 = cellToPx(top);
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const len = Math.max(1, Math.sqrt(dx*dx + dy*dy));
+  const ux = dx/len, uy = dy/len;
+  const perpX = -uy, perpY = ux;
+  const halfW = cellSize * 0.18;
+
+  // Two rails
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Shadow
+  ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+  ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(p1.x+perpX*halfW+2, p1.y+perpY*halfW+2); ctx.lineTo(p2.x+perpX*halfW+2, p2.y+perpY*halfW+2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(p1.x-perpX*halfW+2, p1.y-perpY*halfW+2); ctx.lineTo(p2.x-perpX*halfW+2, p2.y-perpY*halfW+2); ctx.stroke();
+
+  // Main rails
+  ctx.strokeStyle = '#D4780A';
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(p1.x+perpX*halfW, p1.y+perpY*halfW); ctx.lineTo(p2.x+perpX*halfW, p2.y+perpY*halfW); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(p1.x-perpX*halfW, p1.y-perpY*halfW); ctx.lineTo(p2.x-perpX*halfW, p2.y-perpY*halfW); ctx.stroke();
+
+  // Highlight
+  ctx.strokeStyle = '#FFB703';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(p1.x+perpX*halfW, p1.y+perpY*halfW); ctx.lineTo(p2.x+perpX*halfW, p2.y+perpY*halfW); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(p1.x-perpX*halfW, p1.y-perpY*halfW); ctx.lineTo(p2.x-perpX*halfW, p2.y-perpY*halfW); ctx.stroke();
+
+  // Rungs
+  const numRungs = Math.max(3, Math.floor(len / (cellSize * 0.35)));
+  for(let i=1; i<numRungs; i++){
+    const t = i / numRungs;
+    const rx = p1.x + dx*t;
+    const ry = p1.y + dy*t;
+    // Shadow
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(rx+perpX*halfW+1, ry+perpY*halfW+1); ctx.lineTo(rx-perpX*halfW+1, ry-perpY*halfW+1); ctx.stroke();
+    // Main
+    ctx.strokeStyle = '#D4780A';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(rx+perpX*halfW, ry+perpY*halfW); ctx.lineTo(rx-perpX*halfW, ry-perpY*halfW); ctx.stroke();
+    // Highlight
+    ctx.strokeStyle = '#FFB703';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(rx+perpX*halfW, ry+perpY*halfW); ctx.lineTo(rx-perpX*halfW, ry-perpY*halfW); ctx.stroke();
+  }
+}
+
+/* ===================== DRAW SNAKE ===================== */
+function drawSnake(head, tail, idx){
+  const hp = cellToPx(head);
+  const tp = cellToPx(tail);
+  const dx = tp.x - hp.x;
+  const dy = tp.y - hp.y;
+  const len = Math.max(1, Math.sqrt(dx*dx + dy*dy));
+  const perpX = -dy/len, perpY = dx/len;
+
+  // Alternating wave direction for visual variety
+  const waveDir = idx % 2 === 0 ? 1 : -1;
+  const waveMag = len * 0.22 * waveDir;
+
+  // S-curve control points
+  const cp1x = hp.x + dx*0.3 + perpX*waveMag;
+  const cp1y = hp.y + dy*0.3 + perpY*waveMag;
+  const cp2x = hp.x + dx*0.7 - perpX*waveMag*0.6;
+  const cp2y = hp.y + dy*0.7 - perpY*waveMag*0.6;
+
+  // Draw body - outer (dark)
+  ctx.beginPath();
+  ctx.moveTo(hp.x, hp.y);
+  ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, tp.x, tp.y);
+  ctx.strokeStyle = '#7A1520';
+  ctx.lineWidth = cellSize * 0.18;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Body - main
+  ctx.beginPath();
+  ctx.moveTo(hp.x, hp.y);
+  ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, tp.x, tp.y);
+  ctx.strokeStyle = '#C4222F';
+  ctx.lineWidth = cellSize * 0.13;
+  ctx.stroke();
+
+  // Body - highlight
+  ctx.beginPath();
+  ctx.moveTo(hp.x, hp.y);
+  ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, tp.x, tp.y);
+  ctx.strokeStyle = '#E85560';
+  ctx.lineWidth = cellSize * 0.05;
+  ctx.stroke();
+
+  // Snake pattern - draw segments for scale effect
+  const segments = 8;
+  for(let i=1; i<segments; i++){
+    const t = i / segments;
+    // Approximate point on bezier
+    const u = 1-t;
+    const sx = u*u*u*hp.x + 3*u*u*t*cp1x + 3*u*t*t*cp2x + t*t*t*tp.x;
+    const sy = u*u*u*hp.y + 3*u*u*t*cp1y + 3*u*t*t*cp2y + t*t*t*tp.y;
+    // Small perpendicular line for scale
+    const scaleW = cellSize * 0.08 * (1 - t*0.5);
+    ctx.beginPath();
+    ctx.moveTo(sx + perpX*scaleW, sy + perpY*scaleW);
+    ctx.lineTo(sx - perpX*scaleW, sy - perpY*scaleW);
+    ctx.strokeStyle = 'rgba(100,15,25,0.35)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Head
+  const headR = cellSize * 0.17;
+  ctx.beginPath();
+  ctx.arc(hp.x, hp.y, headR, 0, Math.PI*2);
+  const hg = ctx.createRadialGradient(hp.x - headR*0.3, hp.y - headR*0.3, 0, hp.x, hp.y, headR);
+  hg.addColorStop(0, '#FF6B6B');
+  hg.addColorStop(1, '#A01A28');
+  ctx.fillStyle = hg;
+  ctx.fill();
+  ctx.strokeStyle = '#7A1520';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Eyes
+  const eyeOff = headR * 0.35;
+  const eyeR = headR * 0.22;
+  // Direction toward body
+  const toBodyX = (cp1x - hp.x); const toBodyY = (cp1y - hp.y);
+  const tLen = Math.max(1, Math.sqrt(toBodyX*toBodyX + toBodyY*toBodyY));
+  const tdx = toBodyX/tLen, tdy = toBodyY/tLen;
+  const eyePerpX = -tdy, eyePerpY = tdx;
+
+  for(let side of [-1,1]){
+    const ex = hp.x - tdx*eyeOff*0.5 + eyePerpX*eyeOff*side;
+    const ey = hp.y - tdy*eyeOff*0.5 + eyePerpY*eyeOff*side;
+    // White
+    ctx.beginPath(); ctx.arc(ex, ey, eyeR, 0, Math.PI*2);
+    ctx.fillStyle = '#fff'; ctx.fill();
+    // Pupil
+    ctx.beginPath(); ctx.arc(ex - tdx*eyeR*0.3, ey - tdy*eyeR*0.3, eyeR*0.55, 0, Math.PI*2);
+    ctx.fillStyle = '#1A0A0A'; ctx.fill();
+  }
+
+  // Tongue (small fork)
+  const tongueStart_x = hp.x - tdx*headR;
+  const tongueStart_y = hp.y - tdy*headR;
+  const tongueLen = cellSize * 0.12;
+  ctx.strokeStyle = '#FF4455';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(tongueStart_x, tongueStart_y);
+  ctx.lineTo(tongueStart_x - tdx*tongueLen + eyePerpX*3, tongueStart_y - tdy*tongueLen + eyePerpY*3);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(tongueStart_x, tongueStart_y);
+  ctx.lineTo(tongueStart_x - tdx*tongueLen - eyePerpX*3, tongueStart_y - tdy*tongueLen - eyePerpY*3);
+  ctx.stroke();
+
+  // Tail taper (small triangle)
+  ctx.beginPath();
+  ctx.moveTo(tp.x, tp.y);
+  ctx.lineTo(tp.x + perpX*cellSize*0.06, tp.y + perpY*cellSize*0.06);
+  ctx.lineTo(tp.x - perpX*cellSize*0.06, tp.y - perpY*cellSize*0.06);
+  ctx.closePath();
+  ctx.fillStyle = '#C4222F';
+  ctx.fill();
+}
+
+/* ===================== DRAW STAR ===================== */
+function drawStar(cell){
+  const p = cellToPx(cell);
+  const r = cellSize * 0.25;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.beginPath();
+  for(let i=0; i<5; i++){
+    const a1 = (i*72 - 90) * Math.PI/180;
+    const a2 = ((i*72)+36 - 90) * Math.PI/180;
+    ctx.lineTo(Math.cos(a1)*r, Math.sin(a1)*r);
+    ctx.lineTo(Math.cos(a2)*r*0.45, Math.sin(a2)*r*0.45);
+  }
+  ctx.closePath();
+  const sg = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+  sg.addColorStop(0, '#FFE066');
+  sg.addColorStop(1, '#FFB703');
+  ctx.fillStyle = sg;
+  ctx.fill();
+  ctx.strokeStyle = '#D4960A';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* ===================== DRAW TOKENS ===================== */
+function drawTokens(){
+  const colors = [
+    {main:'#E63946', light:'#FF8A93', dark:'#A01A28'},
+    {main:'#219EBC', light:'#6DD5ED', dark:'#157A94'}
+  ];
+
+  for(let i=0; i<2; i++){
+    const pos = players[i].disp;
+    if(pos <= 0) continue;
+
+    const p = cellToPx(pos);
+
+    // Offset if same cell
+    const other = players[1-i].disp;
+    let ox=0, oy=0;
+    if(other === pos && other > 0){
+      ox = i===0 ? -cellSize*0.14 : cellSize*0.14;
+      oy = i===0 ? -cellSize*0.14 : cellSize*0.14;
+    }
+
+    const x = p.x + ox;
+    const y = p.y + oy;
+    const r = cellSize * 0.2;
+
+    // Shadow
+    ctx.beginPath();
+    ctx.arc(x+2, y+3, r, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fill();
+
+    // Body gradient
+    const g = ctx.createRadialGradient(x-r*0.35, y-r*0.35, 0, x, y, r);
+    g.addColorStop(0, colors[i].light);
+    g.addColorStop(1, colors[i].dark);
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI*2);
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Inner shine
+    ctx.beginPath();
+    ctx.arc(x-r*0.2, y-r*0.2, r*0.35, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fill();
+
+    // Number
+    const fs = Math.max(9, cellSize * 0.22);
+    ctx.font = `900 ${fs}px Nunito`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    ctx.fillText('P'+(i+1), x, y+1);
+  }
+}
+
+/* ===================== ANIMATE MOVE ===================== */
+async function animateMove(pIdx, from, to){
+  const step = from < to ? 1 : -1;
+  let cur = from;
+  while(cur !== to){
+    cur += step;
+    players[pIdx].disp = cur;
+    drawBoard();
+    await delay(130);
+  }
+}
+
+/* ===================== ROLL DICE ===================== */
+async function rollDice(){
+  if(animating || gameOver) return;
+  animating = true;
+  rollBtn.disabled = true;
+
+  // Dice animation
+  diceEl.classList.add('rolling');
+  // Flash random faces during roll
+  let flashCount = 0;
+  const flashInterval = setInterval(()=>{
+    setDiceFace(Math.floor(Math.random()*6)+1);
+    flashCount++;
+    if(flashCount > 8) clearInterval(flashInterval);
+  }, 60);
+
+  await delay(580);
+  diceEl.classList.remove('rolling');
+  clearInterval(flashInterval);
+
+  const value = Math.floor(Math.random()*6)+1;
+  setDiceFace(value);
+
+  const p = players[curPlayer];
+  const name = 'Player '+(curPlayer+1);
+
+  if(p.pos === 0){
+    // Enter board
+    const newPos = Math.min(value, 100);
+    addLog(`${name} rolls ${value} — enters the board at ${newPos}`);
+    await animateMove(curPlayer, 0, newPos);
+    p.pos = newPos;
+  } else {
+    const newPos = p.pos + value;
+    if(newPos > 100){
+      addLog(`${name} rolls ${value} — need ${100-p.pos}, can't move`);
+      showToast(`Need ${100-p.pos} or less!`, 'info');
+    } else {
+      addLog(`${name} rolls ${value} — moves to ${newPos}`);
+      await animateMove(curPlayer, p.pos, newPos);
+      p.pos = newPos;
+
+      // Check snake
+      if(SNAKE_MAP[newPos]){
+        const dest = SNAKE_MAP[newPos];
+        await delay(350);
+        showToast(`Snake! Slide down to ${dest}`, 'snake');
+        addLog(`${name} bit by a snake! ${newPos} → ${dest}`);
+        await animateMove(curPlayer, newPos, dest);
+        p.pos = dest;
+      }
+      // Check ladder
+      else if(LADDER_MAP[newPos]){
+        const dest = LADDER_MAP[newPos];
+        await delay(350);
+        showToast(`Ladder! Climb up to ${dest}`, 'ladder');
+        addLog(`${name} found a ladder! ${newPos} → ${dest}`);
+        await animateMove(curPlayer, newPos, dest);
+        p.pos = dest;
+      }
+
+      // Win check
+      if(p.pos === 100){
+        gameOver = true;
+        addLog(`${name} wins the game!`);
+        showToast(`${name} wins!`, 'win');
+        spawnConfetti();
+        updateUI();
+        animating = false;
+        return;
+      }
+    }
+  }
+
+  // Extra turn on 6
+  if(value === 6 && p.pos !== 100){
+    addLog(`${name} rolled a 6 — extra turn!`);
+    showToast('Rolled a 6! Go again!', 'info');
+  } else {
+    curPlayer = (curPlayer + 1) % 2;
+  }
+
+  updateUI();
+  animating = false;
+}
+
+/* ===================== UI UPDATE ===================== */
+function updateUI(){
+  // Positions
+  for(let i=0;i<2;i++){
+    document.getElementById('pos'+i).textContent = players[i].pos || '—';
+    document.getElementById('bar'+i).style.width = players[i].pos + '%';
+  }
+  // Active player cards
+  document.getElementById('card0').className = 'p-card' + (curPlayer===0 && !gameOver ? ' active-p1' : '');
+  document.getElementById('card1').className = 'p-card' + (curPlayer===1 && !gameOver ? ' active-p2' : '');
+  // Turn label
+  if(gameOver){
+    turnLabel.textContent = 'Game Over!';
+    turnLabel.style.color = 'var(--accent)';
+    rollBtn.disabled = true;
+  } else {
+    turnLabel.textContent = 'Player '+(curPlayer+1)+"'s Turn";
+    turnLabel.style.color = curPlayer===0 ? 'var(--p1)' : 'var(--p2)';
+    rollBtn.disabled = false;
+  }
+}
+
+/* ===================== NEW GAME ===================== */
+function newGame(){
+  players = [{pos:0, disp:0},{pos:0, disp:0}];
+  curPlayer = 0;
+  animating = false;
+  gameOver = false;
+  logList.innerHTML = '';
+  setDiceFace(1);
+  addLog('New game started! Player 1 goes first.');
+  updateUI();
+  drawBoard();
+}
+
+/* ===================== RESIZE ===================== */
+function resize(){
+  const wrap = document.getElementById('boardWrap');
+  const maxW = Math.min(window.innerWidth - 300, 620);
+  const maxH = window.innerHeight - 160;
+  const maxBoard = Math.min(maxW, maxH, 620);
+  cellSize = Math.max(32, Math.floor(maxBoard / GRID));
+
+  const size = cellSize * GRID;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = size * dpr;
+  canvas.height = size * dpr;
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  drawBoard();
+}
+
+/* ===================== INIT ===================== */
+rollBtn.addEventListener('click', rollDice);
+newBtn.addEventListener('click', newGame);
+
+// Keyboard support
+document.addEventListener('keydown', e => {
+  if(e.code === 'Space' || e.code === 'Enter'){
+    e.preventDefault();
+    if(!gameOver) rollDice();
+  }
+});
+
+window.addEventListener('resize', resize);
+resize();
+newGame();
+</script>
+</body>
+</html>
